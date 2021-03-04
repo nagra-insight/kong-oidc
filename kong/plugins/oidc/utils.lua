@@ -29,8 +29,10 @@ function M.get_redirect_uri(ngx)
   end
 
   local function tackle_slash(path)
+    ngx.log(ngx.DEBUG, "tackle_slash path=" .. path)
     local args = ngx.req.get_uri_args()
     if args and args.code then
+      ngx.log(ngx.DEBUG, "args.code=" .. args.code)
       return path
     elseif path == "/" then
       return "/cb"

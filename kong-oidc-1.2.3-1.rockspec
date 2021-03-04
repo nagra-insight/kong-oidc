@@ -2,7 +2,7 @@ package = "kong-oidc"
 version = "1.2.3-1"
 source = {
     url = "git://github.com/nagra-insight/kong-oidc",
-    tag = "master",
+    tag = "fix-redirect",
     dir = "kong-oidc"
 }
 description = {
@@ -34,3 +34,4 @@ build = {
     ["kong.plugins.oidc.utils"] = "kong/plugins/oidc/utils.lua"
     }
 }
+
