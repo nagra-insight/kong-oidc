@@ -20,6 +20,7 @@ end
 function M.get_redirect_uri(ngx)
   local function drop_query()
     local uri = ngx.var.request_uri
+    ngx.log(ngx.DEBUG, "drop_query uri=" .. uri)
     local x = uri:find("?")
     if x then
       return uri:sub(1, x - 1)
@@ -29,15 +30,17 @@ function M.get_redirect_uri(ngx)
   end
 
   local function tackle_slash(path)
+    ngx.log(ngx.DEBUG, "tackle_slash path=" .. path)
     local args = ngx.req.get_uri_args()
     if args and args.code then
+      ngx.log(ngx.DEBUG, "args.code=" .. args.code)
       return path
-    elseif path == "/" then
-      return "/cb"
-    elseif path:sub(-1) == "/" then
-      return path:sub(1, -2)
+    -- elseif path == "/" then
+    --   return "/cb"
+    -- elseif path:sub(-1) == "/" then
+    --   return path:sub(1, -2)
     else
-      return path .. "/"
+      return "/cb?post_login=" .. path
     end
   end
 
