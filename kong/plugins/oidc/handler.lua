@@ -128,6 +128,19 @@ function introspect(oidcConfig)
       end
       return nil
     end
+    -- authorization - validate scope
+    if oidcConfig.validate_scope == "yes" then
+      local validScope = false
+      for scope in res.scope:gmatch("([^ ]+)") do
+        if scope == oidcConfig.scope then
+          validScope = true
+          break
+        end
+      end
+      if not validScope then
+        utils.exit(ngx.HTTP_FORBIDDEN,"Invalid scope",ngx.HTTP_FORBIDDEN)
+      end
+    end
     ngx.log(ngx.DEBUG, "OidcHandler introspect succeeded, requested path: " .. ngx.var.request_uri)
     return res
   end
