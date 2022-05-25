@@ -80,7 +80,8 @@ function M.get_options(config, ngx)
     bearer_jwt_auth_signing_algs = config.bearer_jwt_auth_signing_algs,
     header_names = config.header_names or {},
     header_claims = config.header_claims or {},
-    session_contents = {id_token=true, enc_id_token=false, user=true, access_token=false}
+    session_contents = {id_token=true, enc_id_token=false, user=true, access_token=false},
+    authorization_params = config.extra_authorization_params
   }
 end
 
