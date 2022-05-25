@@ -1,0 +1,29 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: check that the version has been bumped
+          command: make check-release
+
+  release:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run: make release
+
+workflows:
+  main:
+    jobs:
+      - test
+      - release:
+          requires:
+            - test
+          filters:
+            branches:
+              only: master
