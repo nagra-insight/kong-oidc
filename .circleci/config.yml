@@ -129,14 +129,6 @@ jobs:
             curl -L -o /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
             chmod +x /tmp/jq
             sudo mv /tmp/jq /usr/local/bin/
-
-            # install yq
-            if sudo which pip > /dev/null; then
-              sudo pip install yq
-            else
-              # the newer circleci image do not require to call sudo
-              pip install yq
-            fi
       - run:
           name: install Github CLI (gh)
           command: |

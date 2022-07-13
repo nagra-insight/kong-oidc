@@ -85,8 +85,8 @@ jobs:
     executor: default
     steps:
       - *attach_workspace
-      - {{ tmpl.Exec "step_install_jq" | indent 8 | strings.TrimSpace }}
-      - {{ tmpl.Exec "step_install_github_cli" (dict "yq" false) | indent 8 | strings.TrimSpace }}
+      - {{ tmpl.Exec "step_install_jq" (dict "yq" false) | indent 8 | strings.TrimSpace }}
+      - {{ tmpl.Exec "step_install_github_cli" | indent 8 | strings.TrimSpace }}
       - run: make release
 
 workflows:
