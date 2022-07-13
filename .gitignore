@@ -13,3 +13,7 @@ bin/venv/
 # IntelliJ IDEA
 *.iml
 .idea
+
+# misc
+*.all.rock
+ci-tools
