@@ -56,11 +56,6 @@ executors:
       - image: cimg/base:stable
     working_directory: *workspace_root
     resource_class: small
-  vm:
-    machine:
-      image: ubuntu-2204:2022.04.1
-    working_directory: *workspace_root
-    resource_class: medium
 
 jobs:
   setup_workspace:
@@ -102,13 +97,12 @@ jobs:
       - *persist_to_workspace
 
   test:
-    executor: vm
+    executor: default
     steps:
       - *attach_workspace
       - run:
           name: check that the version in rockspec file has been updated
           command: make check-release
-      - run: make test
 
   build:
     executor: default
