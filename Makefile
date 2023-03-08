@@ -5,7 +5,7 @@ VERSION:=$(shell sed -n 's/version = \"\(.*\)\"/\1/p' kong-oidc-*ni*.rockspec)
 
 .PHONY: build
 build: ## build binary
-	luarocks build --pack-binary-rock kong-oidc-$(VERSION).rockspec
+	luarocks build --pack-binary-rock
 
 .PHONY: check-release
 check-release: ## check if the current version can be released
