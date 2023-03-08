@@ -296,8 +296,14 @@ return {
           },
           {
             extra_authorization_params = {
-              type = "table",
+              type = "map",
               required = false,
+              keys = {
+                type = "string"
+              },
+              values = {
+                type = "string"
+              },
               default = {}
             }
           }
