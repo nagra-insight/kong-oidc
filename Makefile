@@ -3,11 +3,6 @@ COMMON_MAKEFILES=cd
 
 VERSION:=$(shell sed -n 's/version = \"\(.*\)\"/\1/p' kong-oidc-*ni*.rockspec)
 
-
-.PHONY: test
-test: ## run unit tests
-	./bin/run-unit-tests.sh
-
 .PHONY: build
 build: ## build binary
 	luarocks build --pack-binary-rock

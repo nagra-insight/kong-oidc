@@ -17,3 +17,4 @@ bin/venv/
 # misc
 *.all.rock
 ci-tools
+.dccache
