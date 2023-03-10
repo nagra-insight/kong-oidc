@@ -1,7 +1,8 @@
 # common makefiles to include (see available Makefiles: https://github.com/nagra-insight/ci-tools/tree/master/makefiles)
 COMMON_MAKEFILES=cd
 
-VERSION:=$(shell sed -n 's/version = \"\(.*\)\"/\1/p' kong-oidc-*ni*.rockspec)
+NAME=kong-oidc
+VERSION:=$(shell sed -n 's/version = \"\(.*\)\"/\1/p' $(NAME)-*ni*.rockspec)
 KONG_VERSION=3.1.1
 
 .PHONY: test
@@ -27,24 +28,25 @@ build: ## build binary
 .PHONY: check-release
 check-release: ## check if the current version can be released
 	@# check that the version has been bumped
-	@if [ $$(git tag -l $(VERSION)) ]; then \
-		echo "Tag $(VERSION) already exists. Exit."; \
+	@if [ $$(git tag -l $(NAME)@$(VERSION)) ]; then \
+		echo "Tag $(NAME)@$(VERSION) already exists. Exit."; \
 		exit 1; \
 	fi
 	@# check that the rockspec file name matched the version in it
 	@# see: https://github.com/luarocks/luarocks/wiki/Creating-a-rock#writing-a-rockspec
-	@if [ ! -f "kong-oidc-$(VERSION).rockspec" ]; then \
+	@if [ ! -f "$(NAME)-$(VERSION).rockspec" ]; then \
 		echo "rockspec file name not found for version $(VERSION). Did you forget to rename it?"; \
 		exit 1; \
 	fi
+	@echo "$(NAME)@$(VERSION) not released yet, all good!"
 
 .PHONY: release
 release: ## create new Github release
-	@if [ ! -f "kong-oidc-$(VERSION).all.rock" ]; then \
+	@if [ ! -f "$(NAME)-$(VERSION).all.rock" ]; then \
 		echo "no binary rock file found for version $(VERSION) in $(shell pwd):"; \
 		ls -al; \
 	fi
-	@make cd/release NAME=kong-oidc VERSION=$(VERSION) FILE=kong-oidc-$(VERSION).all.rock
+	@make cd/release NAME=$(NAME) VERSION=$(VERSION) FILE=$(NAME)-$(VERSION).all.rock
 
 ##### DO NOT MODIFY BELOW - BEGIN #####################
 SELF=$(MAKE)
