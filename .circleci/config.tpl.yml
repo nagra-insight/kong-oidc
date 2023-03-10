@@ -17,6 +17,16 @@ references:
   ###################################
   # Install packages
 
+  install_pongo: &install_pongo
+    run:
+      name: install pongo CLI
+      command: |
+        VERSION="2.5.0"
+        REPO_PATH="/tmp/kong-pongo"
+        git clone https://github.com/Kong/kong-pongo.git $REPO_PATH
+        git -C $REPO_PATH checkout $VERSION
+        sudo ln -s $REPO_PATH/pongo.sh /usr/local/bin/pongo
+
   install_luarocks: &install_luarocks
     run:
       name: install luarocks
@@ -49,6 +59,11 @@ executors:
       - image: cimg/base:stable
     working_directory: *workspace_root
     resource_class: small
+  vm:
+    machine:
+      image: ubuntu-2204:2023.02.1
+    working_directory: *workspace_root
+    resource_class: medium
 
 jobs:
   setup_workspace:
@@ -60,12 +75,16 @@ jobs:
       - *persist_to_workspace
 
   test:
-    executor: default
+    # use machine for pongo due to docker volume mounts
+    # not working in docker-in-docker setup.
+    executor: vm
     steps:
       - *attach_workspace
+      - *install_pongo
       - run:
           name: check that the version in rockspec file has been updated
           command: make check-release
+      - run: make test
 
   build:
     executor: default
