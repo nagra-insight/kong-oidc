@@ -18,3 +18,4 @@ bin/venv/
 *.all.rock
 ci-tools
 .dccache
+servroot
