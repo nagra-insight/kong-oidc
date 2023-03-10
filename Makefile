@@ -2,6 +2,23 @@
 COMMON_MAKEFILES=cd
 
 VERSION:=$(shell sed -n 's/version = \"\(.*\)\"/\1/p' kong-oidc-*ni*.rockspec)
+KONG_VERSION=3.1.1
+
+.PHONY: test
+test: test/unit test/integration ## run all tests tests
+
+.PHONY: test/unit
+test/unit: ## run unit tests only
+	./bin/run-unit-tests.sh
+
+.PHONY: test/integration
+test/integration: ## run integration tests only
+	KONG_VERSION=$(KONG_VERSION) pongo run --no-cassandra
+
+.PHONY: test/clean
+test/clean: ## shutdown test container and clean tmp directories
+	rm -rf servroot
+	pongo down
 
 .PHONY: build
 build: ## build binary
