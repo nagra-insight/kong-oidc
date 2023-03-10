@@ -1,43 +1,46 @@
 local helpers = require "spec.helpers"
+local fixtures = require "spec.fixtures.oidc"
 
+PLUGIN_NAME = "oidc"
 
 describe("oidc plugin", function()
   local proxy_client
-  local admin_client
   local timeout = 6000
 
-  setup(function()
-    local api1 = assert(helpers.dao.apis:insert {
+  lazy_setup(function()
+    local bp = helpers.get_db_utils("postgres", nil, { PLUGIN_NAME })
+    local api1 = assert(bp.routes:insert {
       name = "mock",
-      upstream_url = "http://mockbin.com",
-      uris = { "/mock" }
+      hosts = { "mockbin.com" },
+      paths = { "/mock" }
     })
     print("Api created:")
     for k, v in pairs(api1) do
       print(k, ": ", v)
     end
-    assert(helpers.dao.plugins:insert {
-      name = "oidc",
+    assert(bp.plugins:insert {
+      name = PLUGIN_NAME,
       config = {
         client_id = "afcc3a0a-aaa4-4bac-b86a-a7bd77259dd3",
         client_secret = "81de73f0-3a0e-451a-88ee-e540811a049c",
-        discovery = "http://mockbin.org/bin/bd08be64-1820-4e1a-aca2-b4a38cd07961/"
+        discovery = "http://127.0.0.1/.well-known/openid-configuration"
       }
     })
 
-    -- start Kong with your testing Kong configuration (defined in "spec.helpers")
-    assert(helpers.start_kong())
+    -- start kong
+    assert(helpers.start_kong({
+      -- set the strategy
+      database   = "postgres",
+      -- use the custom test template to create a local mock server
+      nginx_conf = "spec/fixtures/custom_nginx.template",
+      -- make sure our plugin gets loaded
+      plugins = "bundled," .. PLUGIN_NAME,
+    }, nil, nil, fixtures))
     print("Kong started")
-
-    admin_client = helpers.admin_client(timeout)
   end)
 
-  teardown(function()
-    if admin_client then
-      admin_client:close()
-    end
-
-    helpers.stop_kong()
+  lazy_teardown(function()
+    helpers.stop_kong(nil, true)
     print("Kong stopped")
   end)
 
@@ -56,6 +59,9 @@ describe("oidc plugin", function()
       local res = assert(proxy_client:send {
         method = "GET",
         path   = "/mock",
+        headers = {
+          host = "mockbin.com",
+        },
       })
       local body = assert.res_status(302, res)
       local redirect_uri = res.headers["Location"]
@@ -64,6 +70,7 @@ describe("oidc plugin", function()
       assert.is_truthy(string.find(redirect_uri, "client_id="))
       assert.is_truthy(string.find(redirect_uri, "state="))
       assert.is_truthy(string.find(redirect_uri, "redirect_uri="))
+      print(redirect_uri)
     end)
 
     it("should after successful login contact token and userinfo endpoints", function()
@@ -71,6 +78,9 @@ describe("oidc plugin", function()
       local res = assert(proxy_client:send {
         method = "GET",
         path   = "/mock/?state=123456&code=123456",
+        headers = {
+          host = "mockbin.com",
+        },
       })
       -- This will fail in openidc.lua because session created in first phase is loat
       -- and several things could mismatch (state, nonce, original_url, ...)
