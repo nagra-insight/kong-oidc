@@ -295,6 +295,18 @@ return {
             }
           },
           {
+            http_proxy = {
+              type = "string",
+              required = false
+            }
+          },
+          {
+            https_proxy = {
+              type = "string",
+              required = false
+            }
+          },
+          {
             extra_authorization_params = {
               type = "map",
               required = false,
