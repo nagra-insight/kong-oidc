@@ -83,7 +83,7 @@ function M.get_options(config, ngx)
     proxy_opts = {
       http_proxy  = config.http_proxy,
       https_proxy = config.https_proxy
-    }
+    },
     session_contents = {id_token=true, enc_id_token=false, user=true, access_token=false},
     authorization_params = config.extra_authorization_params
   }
