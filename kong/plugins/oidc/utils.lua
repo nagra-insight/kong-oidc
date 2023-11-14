@@ -80,6 +80,10 @@ function M.get_options(config, ngx)
     bearer_jwt_auth_signing_algs = config.bearer_jwt_auth_signing_algs,
     header_names = config.header_names or {},
     header_claims = config.header_claims or {},
+    proxy_opts = {
+      http_proxy  = config.http_proxy,
+      https_proxy = config.https_proxy
+    },
     session_contents = {id_token=true, enc_id_token=false, user=true, access_token=false},
     authorization_params = config.extra_authorization_params
   }
@@ -172,10 +176,15 @@ function M.injectHeaders(header_names, header_claims, sources)
     claim = header_claims[i]
     kong.service.request.clear_header(header)
     for j = 1, #sources do
-      local source
+      local source, claim_value
       source = sources[j]
+      claim_value = source[claim]
+      -- Convert table to string if claim is a table
+      if type(claim_value) == "table" then
+        claim_value = table.concat(claim_value, ", ")
+      end
       if (source and source[claim]) then
-        kong.service.request.set_header(header, source[claim])
+        kong.service.request.set_header(header, claim_value)
         break
       end
     end

@@ -3,7 +3,7 @@ COMMON_MAKEFILES=cd
 
 NAME=kong-oidc
 VERSION:=$(shell sed -n 's/version = \"\(.*\)\"/\1/p' $(NAME)-*ni*.rockspec)
-KONG_VERSION=3.1.1
+KONG_VERSION=3.5.0
 
 .PHONY: test
 test: test/unit test/integration ## run all tests tests
