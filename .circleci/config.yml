@@ -44,7 +44,7 @@ references:
         sudo apt-get install build-essential libreadline-dev unzip
 
         # install lua
-        curl -R -O http://www.lua.org/ftp/lua-$LUA_VERSION.tar.gz
+        curl -R -O https://www.lua.org/ftp/lua-$LUA_VERSION.tar.gz
         tar -zxf lua-$LUA_VERSION.tar.gz
         cd lua-$LUA_VERSION
         make linux test
@@ -135,6 +135,34 @@ jobs:
     executor: default
     steps:
       - *attach_workspace
+      - run:
+          name: Configure AWS profiles
+          command: |
+            # install aws cli if needed
+            if ! command -v aws &> /dev/null; then
+              if sudo which pip > /dev/null; then
+                sudo pip install awscli
+              else
+                pip install awscli
+              fi
+            fi
+
+            # OIDC token must be stored on file system
+            web_identity_token_file="$HOME/.aws/.circleci.oidc.token"
+            mkdir -p ~/.aws/ && echo $CIRCLE_OIDC_TOKEN > $web_identity_token_file
+
+            # default profile
+            aws configure --profile default set role_arn arn:aws:iam::882571264765:role/system/CircleCI-default
+            aws configure --profile default set web_identity_token_file $web_identity_token_file
+            aws configure --profile default set role_session_name "CircleCI-${CIRCLE_WORKFLOW_ID}-${CIRCLE_BUILD_NUM}"
+            aws configure --profile default set region "eu-west-1"
+
+            # secrets profile
+            secrets_profile="580978913621" # the 'internal' AWS account ID (it is used as profile name in the common Makefiles)
+            aws configure --profile $secrets_profile set role_arn arn:aws:iam::580978913621:role/system/SecretsManagerCircleCI-default
+            aws configure --profile $secrets_profile set web_identity_token_file $web_identity_token_file
+            aws configure --profile $secrets_profile set role_session_name "CircleCI-secrets-${CIRCLE_WORKFLOW_ID}-${CIRCLE_BUILD_NUM}"
+            aws configure --profile $secrets_profile set region "eu-west-1"
       - run:
           name: install jq 1.6
           command: |
