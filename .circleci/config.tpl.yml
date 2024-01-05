@@ -37,7 +37,7 @@ references:
         sudo apt-get install build-essential libreadline-dev unzip
 
         # install lua
-        curl -R -O http://www.lua.org/ftp/lua-$LUA_VERSION.tar.gz
+        curl -R -O https://www.lua.org/ftp/lua-$LUA_VERSION.tar.gz
         tar -zxf lua-$LUA_VERSION.tar.gz
         cd lua-$LUA_VERSION
         make linux test
@@ -98,6 +98,7 @@ jobs:
     executor: default
     steps:
       - *attach_workspace
+      - {{ tmpl.Exec "step_aws_setup" | indent 8 | strings.TrimSpace }}
       - {{ tmpl.Exec "step_install_jq" (dict "yq" false) | indent 8 | strings.TrimSpace }}
       - {{ tmpl.Exec "step_install_github_cli" | indent 8 | strings.TrimSpace }}
       - run: make release
