@@ -18,20 +18,19 @@ return {
                     {
                         client_id = {
                             type = "string",
-                            required = true
+                            required = false
                         }
                     },
                     {
                         client_secret = {
                             type = "string",
-                            required = true
+                            required = false
                         }
                     },
                     {
                         discovery = {
                             type = "string",
-                            required = true,
-                            default = "https://.well-known/openid-configuration"
+                            required = true
                         }
                     },
                     {
@@ -320,6 +319,25 @@ return {
                         }
                     }
                 }
+            }
+        }
+    },
+    entity_checks = {
+        {
+            custom_entity_check = {
+                field_sources = { "config" },
+                fn = function(entity)
+                    local config = entity.config
+                    if config.bearer_jwt_auth_enable ~= "yes" then
+                        if not config.client_id or config.client_id == "" then
+                            return nil, "client_id is required when bearer_jwt_auth_enable is not 'yes'"
+                        end
+                        if not config.client_secret or config.client_secret == "" then
+                            return nil, "client_secret is required when bearer_jwt_auth_enable is not 'yes'"
+                        end
+                    end
+                    return true
+                end
             }
         }
     }
