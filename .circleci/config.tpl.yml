@@ -21,7 +21,7 @@ references:
     run:
       name: install pongo CLI
       command: |
-        VERSION="2.9.0"
+        VERSION="2.20.0"
         REPO_PATH="/tmp/kong-pongo"
         git clone https://github.com/Kong/kong-pongo.git $REPO_PATH
         git -C $REPO_PATH checkout $VERSION

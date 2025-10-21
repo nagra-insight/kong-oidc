@@ -3,10 +3,7 @@ local typedefs = require "kong.db.schema.typedefs"
 return {
     name = "kong-oidc",
     fields = {
-        {
-            -- this plugin will only be applied to Services or Routes
-            consumer = typedefs.no_consumer
-        },
+
         {
             -- this plugin will only run within Nginx HTTP module
             protocols = typedefs.protocols_http
