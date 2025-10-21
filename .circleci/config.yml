@@ -68,7 +68,7 @@ executors:
     resource_class: small
   vm:
     machine:
-      image: ubuntu-2204:2023.02.1
+      image: ubuntu-2404:current
     working_directory: *workspace_root
     resource_class: medium
 
