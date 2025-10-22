@@ -28,7 +28,7 @@ references:
     run:
       name: install pongo CLI
       command: |
-        VERSION="2.9.0"
+        VERSION="2.20.0"
         REPO_PATH="/tmp/kong-pongo"
         git clone https://github.com/Kong/kong-pongo.git $REPO_PATH
         git -C $REPO_PATH checkout $VERSION
@@ -68,7 +68,7 @@ executors:
     resource_class: small
   vm:
     machine:
-      image: ubuntu-2204:2023.02.1
+      image: ubuntu-2404:current
     working_directory: *workspace_root
     resource_class: medium
 
@@ -144,13 +144,11 @@ jobs:
           command: |
             # install aws cli if needed
             if ! command -v aws &> /dev/null; then
-              if sudo which pip > /dev/null; then
-                sudo pip install awscli
-              elif which pip > /dev/null; then
-                pip install awscli
-              else
+              if command -v sudo &> /dev/null; then
                 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
                 unzip -o /tmp/awscliv2.zip -d /tmp/ && sudo /tmp/aws/install
+              else
+                pip install awscli
               fi
             fi
 
@@ -180,7 +178,7 @@ jobs:
       - run:
           name: install Github CLI (gh)
           command: |
-            GH_VERSION="2.0.0"
+            GH_VERSION="2.56.0"
             curl -L -o /tmp/gh.tgz https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz
             tar -xz -C /tmp -f /tmp/gh.tgz
             sudo mv /tmp/gh_${GH_VERSION}_linux_amd64/bin/gh /usr/local/bin/
