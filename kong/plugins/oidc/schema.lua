@@ -271,6 +271,15 @@ return {
                         }
                     },
                     {
+                        bearer_jwt_auth_required_scopes = {
+                            type = "array",
+                            required = false,
+                            elements = {
+                                type = "string"
+                            }
+                        }
+                    },
+                    {
                         header_names = {
                             type = "array",
                             required = true,

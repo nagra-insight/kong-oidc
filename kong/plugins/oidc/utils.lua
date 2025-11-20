@@ -78,6 +78,7 @@ function M.get_options(config, ngx)
         bearer_jwt_auth_enable = config.bearer_jwt_auth_enable == "yes",
         bearer_jwt_auth_allowed_auds = config.bearer_jwt_auth_allowed_auds,
         bearer_jwt_auth_signing_algs = config.bearer_jwt_auth_signing_algs,
+        bearer_jwt_auth_required_scopes = config.bearer_jwt_auth_required_scopes,
         header_names = config.header_names or {},
         header_claims = config.header_claims or {},
         proxy_opts = {
@@ -168,7 +169,7 @@ end
 function M.injectHeaders(header_names, header_claims, sources)
     if #header_names ~= #header_claims then
         kong.log.err(
-        'Different number of elements provided in header_names and header_claims. Headers will not be added.')
+            'Different number of elements provided in header_names and header_claims. Headers will not be added.')
         return
     end
     for i = 1, #header_names do

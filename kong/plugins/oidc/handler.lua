@@ -145,6 +145,29 @@ function introspect(oidcConfig)
     return nil
 end
 
+local function validate_bearer_jwt_scope(oidcConfig, scope_claim)
+    if not oidcConfig.bearer_jwt_auth_required_scopes or #oidcConfig.bearer_jwt_auth_required_scopes == 0 then
+        return true
+    end
+    if not scope_claim then
+        -- No scope claim in token - deny it
+        return false
+    end
+    -- Parse token scopes into a set for efficient lookup
+    local token_scopes = {}
+    for scope in scope_claim:gmatch("([^ ]+)") do
+        token_scopes[scope] = true
+    end
+    -- Check if any of the required scopes is present in the token
+    for _, required_scope in ipairs(oidcConfig.bearer_jwt_auth_required_scopes) do
+        if token_scopes[required_scope] then
+            return true
+        end
+    end
+    kong.log.err("Bearer JWT scope validation failed: none of the required scopes found in token")
+    return false
+end
+
 function verify_bearer_jwt(oidcConfig)
     if not utils.has_bearer_access_token() then
         return nil
@@ -178,6 +201,10 @@ function verify_bearer_jwt(oidcConfig)
         iat = jwt_validators.required(),
         -- optional validations
         nbf = jwt_validators.opt_is_not_before(),
+        -- scope validation
+        scope = function(val)
+            return validate_bearer_jwt_scope(oidcConfig, val)
+        end
     }
 
     local json, err, token = require("resty.openidc").bearer_jwt_verify(opts, claim_spec)
