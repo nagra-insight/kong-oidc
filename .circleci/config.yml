@@ -178,7 +178,7 @@ jobs:
       - run:
           name: install Github CLI (gh)
           command: |
-            GH_VERSION="2.56.0"
+            GH_VERSION="2.82.1"
             curl -L -o /tmp/gh.tgz https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz
             tar -xz -C /tmp -f /tmp/gh.tgz
             sudo mv /tmp/gh_${GH_VERSION}_linux_amd64/bin/gh /usr/local/bin/
