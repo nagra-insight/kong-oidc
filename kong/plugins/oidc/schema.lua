@@ -78,7 +78,7 @@ return {
                         scope = {
                             type = "string",
                             required = true,
-                            default = "openid"
+                            default = "openid offline_access"
                         }
                     },
                     {
