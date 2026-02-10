@@ -5,6 +5,7 @@ local OidcHandler = {
 local utils = require("kong.plugins.oidc.utils")
 local filter = require("kong.plugins.oidc.filter")
 local session = require("kong.plugins.oidc.session")
+local cjson = require("cjson")
 
 local function make_oidc(oidcConfig)
     ngx.log(ngx.DEBUG, "OidcHandler calling authenticate, requested path: " .. ngx.var.request_uri)
@@ -28,6 +29,11 @@ local function make_oidc(oidcConfig)
             return kong.response.error(ngx.HTTP_INTERNAL_SERVER_ERROR)
         end
     end
+
+    if res and res.id_token then
+        ngx.log(ngx.DEBUG, "OIDC id_token: " .. cjson.encode(res.id_token))
+    end
+
     return res
 end
 

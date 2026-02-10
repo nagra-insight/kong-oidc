@@ -85,7 +85,12 @@ function M.get_options(config, ngx)
             http_proxy  = config.http_proxy,
             https_proxy = config.https_proxy
         },
-        session_contents = { id_token = true, enc_id_token = false, user = true, access_token = false },
+        session_contents = {
+            id_token = true,      -- contains user info and roles
+            access_token = true,  -- only needed to get a refresh token to update the ID token when it expires
+            enc_id_token = false, -- downstream services don't need to validate the ID token signature
+            user = false,         -- same content as id_token
+        },
         authorization_params = config.extra_authorization_params
     }
 end
