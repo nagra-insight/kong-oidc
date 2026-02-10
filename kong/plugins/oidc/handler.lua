@@ -7,7 +7,7 @@ local filter = require("kong.plugins.oidc.filter")
 local session = require("kong.plugins.oidc.session")
 local cjson = require("cjson")
 
-local function make_oidc(oidcConfig)
+local function make_oidc(oidcConfig, session_opts)
     ngx.log(ngx.DEBUG, "OidcHandler calling authenticate, requested path: " .. ngx.var.request_uri)
 
     local unauth_action = oidcConfig.unauth_action
@@ -16,7 +16,7 @@ local function make_oidc(oidcConfig)
         unauth_action = "deny"
     end
 
-    local res, err = require("resty.openidc").authenticate(oidcConfig, ngx.var.request_uri, unauth_action)
+    local res, err = require("resty.openidc").authenticate(oidcConfig, ngx.var.request_uri, unauth_action, session_opts)
 
     if err then
         if err == 'unauthorized request' then
@@ -156,8 +156,9 @@ function OidcHandler:access(config)
     end
 
     if filter.shouldProcessRequest(oidcConfig) then
-        session.configure(config)
-        Handle(oidcConfig)
+        local session_opts = utils.get_session_opts(config)
+        session_opts = session.configure(session_opts)
+        Handle(oidcConfig, session_opts)
     else
         ngx.log(ngx.DEBUG, "OidcHandler ignoring request, path: " .. ngx.var.request_uri)
     end
@@ -165,7 +166,7 @@ function OidcHandler:access(config)
     ngx.log(ngx.DEBUG, "OidcHandler done")
 end
 
-function Handle(oidcConfig)
+function Handle(oidcConfig, session_opts)
     local response
 
     if oidcConfig.bearer_jwt_auth_enable then
@@ -194,7 +195,7 @@ function Handle(oidcConfig)
     end
 
     if response == nil then
-        response = make_oidc(oidcConfig)
+        response = make_oidc(oidcConfig, session_opts)
         if response then
             if response.user or response.id_token then
                 -- is there any scenario where lua-resty-openidc would not provide id_token?

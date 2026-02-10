@@ -323,6 +323,15 @@ return {
                             },
                             default = {}
                         }
+                    },
+                    -- Session configuration for lua-resty-session v4.x
+                    -- JSON-encoded string passed to session.start(), see:
+                    -- https://github.com/bungle/lua-resty-session?tab=readme-ov-file#session-configuration
+                    {
+                        session = {
+                            type = "string",
+                            required = false
+                        }
                     }
                 }
             }

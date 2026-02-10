@@ -3,6 +3,20 @@ local constants = require "kong.constants"
 
 local M = {}
 
+-- Get session configuration for lua-resty-session v4.x
+-- Decodes JSON string into Lua table
+function M.get_session_opts(config)
+    if not config.session or config.session == "" then
+        return {}
+    end
+    local ok, session_opts = pcall(cjson.decode, config.session)
+    if not ok then
+        kong.log.err("Failed to decode session config JSON: ", session_opts)
+        return {}
+    end
+    return session_opts
+end
+
 local function parseFilters(csvFilters)
     local filters = {}
     if (not (csvFilters == nil)) and (not (csvFilters == ",")) then
