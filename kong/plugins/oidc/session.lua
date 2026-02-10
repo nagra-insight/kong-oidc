@@ -7,7 +7,7 @@ function M.configure(config)
             kong.log.err("Invalid plugin configuration, session secret could not be decoded")
             return kong.response.error(ngx.HTTP_INTERNAL_SERVER_ERROR)
         end
-        ngx.var.session_secret = decoded_session_secret
+        ngx.var.secret = decoded_session_secret
     end
 end
 
