@@ -78,7 +78,7 @@ return {
                         scope = {
                             type = "string",
                             required = true,
-                            default = "openid"
+                            default = "openid offline_access"
                         }
                     },
                     {
@@ -99,7 +99,7 @@ return {
                         ssl_verify = {
                             type = "string",
                             required = true,
-                            default = "no"
+                            default = "yes"
                         }
                     },
                     {
@@ -322,6 +322,15 @@ return {
                                 type = "string"
                             },
                             default = {}
+                        }
+                    },
+                    -- Session configuration for lua-resty-session v4.x
+                    -- JSON-encoded string passed to session.start(), see:
+                    -- https://github.com/bungle/lua-resty-session?tab=readme-ov-file#session-configuration
+                    {
+                        session = {
+                            type = "string",
+                            required = false
                         }
                     }
                 }

@@ -3,6 +3,48 @@ local constants = require "kong.constants"
 
 local M = {}
 
+-- Sanitize strings for use in HTTP headers (prevent header injection)
+function M.sanitize_header_value(value)
+    if value == nil then
+        return ""
+    end
+    if type(value) ~= "string" then
+        value = tostring(value)
+    end
+    -- Remove CR, LF, NULL bytes and escape quotes to prevent header injection
+    -- Note: Lua patterns use %z for NULL byte, and we chain gsub for clarity
+    return value:gsub("\r", ""):gsub("\n", ""):gsub("%z", ""):gsub('"', '\\"')
+end
+
+-- Get session configuration for lua-resty-session v4.x
+-- Decodes JSON string into Lua table
+-- Returns nil and error message on parse failure (fail closed)
+function M.get_session_opts(config)
+    if not config.session or config.session == "" then
+        return {}
+    end
+
+    local ok, result = pcall(cjson.decode, config.session)
+    if not ok then
+        kong.log.err("CRITICAL: Failed to decode session config JSON: ", result)
+        return nil, "Invalid session configuration: " .. tostring(result)
+    end
+
+    if type(result) ~= "table" then
+        kong.log.err("CRITICAL: Session config must be a JSON object, got: ", type(result))
+        return nil, "Session configuration must be a JSON object"
+    end
+
+    -- Check if it's an array (has numeric keys) rather than an object
+    -- JSON arrays decode to tables with sequential numeric keys starting at 1
+    if result[1] ~= nil then
+        kong.log.err("CRITICAL: Session config must be a JSON object, not an array")
+        return nil, "Session configuration must be a JSON object"
+    end
+
+    return result
+end
+
 local function parseFilters(csvFilters)
     local filters = {}
     if (not (csvFilters == nil)) and (not (csvFilters == ",")) then
@@ -85,7 +127,12 @@ function M.get_options(config, ngx)
             http_proxy  = config.http_proxy,
             https_proxy = config.https_proxy
         },
-        session_contents = { id_token = true, enc_id_token = false, user = true, access_token = false },
+        session_contents = {
+            id_token = true,      -- contains user info and roles
+            access_token = true,  -- only needed to get a refresh token to update the ID token when it expires
+            enc_id_token = false, -- downstream services don't need to validate the ID token signature
+            user = false,         -- same content as id_token
+        },
         authorization_params = config.extra_authorization_params
     }
 end
@@ -148,10 +195,15 @@ function M.injectIDToken(idToken, headerName)
 end
 
 function M.setCredentials(user)
-    local tmp_user = user
-    tmp_user.id = user.sub
-    tmp_user.username = user.preferred_username
-    set_consumer(nil, tmp_user)
+    -- Create a shallow copy to avoid mutating the original user object
+    local credential = {}
+    for k, v in pairs(user) do
+        credential[k] = v
+    end
+    -- Map OIDC claims to Kong credential fields
+    credential.id = user.sub
+    credential.username = user.preferred_username
+    set_consumer(nil, credential)
 end
 
 function M.injectUser(user, headerName)
@@ -225,6 +277,32 @@ function M.has_common_item(t1, t2)
         end
     end
     return false
+end
+
+-- Clear all sensitive headers that this plugin may set
+-- This MUST be called at the start of authentication to prevent header spoofing attacks
+function M.clear_sensitive_headers(oidcConfig)
+    local headers_to_clear = {
+        oidcConfig.userinfo_header_name or "X-USERINFO",
+        oidcConfig.id_token_header_name or "X-ID-Token",
+        oidcConfig.access_token_header_name or "X-Access-Token",
+        constants.HEADERS.CREDENTIAL_IDENTIFIER,
+        constants.HEADERS.CONSUMER_ID,
+        constants.HEADERS.CONSUMER_CUSTOM_ID,
+        constants.HEADERS.CONSUMER_USERNAME,
+        constants.HEADERS.ANONYMOUS,
+    }
+
+    for _, header in ipairs(headers_to_clear) do
+        kong.service.request.clear_header(header)
+    end
+
+    -- Clear custom headers defined in config
+    if oidcConfig.header_names then
+        for _, header in ipairs(oidcConfig.header_names) do
+            kong.service.request.clear_header(header)
+        end
+    end
 end
 
 return M

@@ -5,95 +5,18 @@ local OidcHandler = {
 local utils = require("kong.plugins.oidc.utils")
 local filter = require("kong.plugins.oidc.filter")
 local session = require("kong.plugins.oidc.session")
+local cjson = require("cjson")
 
-
-function OidcHandler:access(config)
-    local oidcConfig = utils.get_options(config, ngx)
-
-    -- partial support for plugin chaining: allow skipping requests, where higher priority
-    -- plugin has already set the credentials. The 'config.anomyous' approach to define
-    -- "and/or" relationship between auth plugins is not utilized
-    if oidcConfig.skip_already_auth_requests and kong.client.get_credential() then
-        ngx.log(ngx.DEBUG, "OidcHandler ignoring already auth request: " .. ngx.var.request_uri)
-        return
-    end
-
-    if filter.shouldProcessRequest(oidcConfig) then
-        session.configure(config)
-        handle(oidcConfig)
-    else
-        ngx.log(ngx.DEBUG, "OidcHandler ignoring request, path: " .. ngx.var.request_uri)
-    end
-
-    ngx.log(ngx.DEBUG, "OidcHandler done")
-end
-
-function handle(oidcConfig)
-    local response
-
-    if oidcConfig.bearer_jwt_auth_enable then
-        response = verify_bearer_jwt(oidcConfig)
-        if response then
-            utils.setCredentials(response)
-            utils.injectGroups(response, oidcConfig.groups_claim)
-            utils.injectHeaders(oidcConfig.header_names, oidcConfig.header_claims, { response })
-            if not oidcConfig.disable_userinfo_header then
-                utils.injectUser(response, oidcConfig.userinfo_header_name)
-            end
-            return
-        end
-    end
-
-    if oidcConfig.introspection_endpoint then
-        response = introspect(oidcConfig)
-        if response then
-            utils.setCredentials(response)
-            utils.injectGroups(response, oidcConfig.groups_claim)
-            utils.injectHeaders(oidcConfig.header_names, oidcConfig.header_claims, { response })
-            if not oidcConfig.disable_userinfo_header then
-                utils.injectUser(response, oidcConfig.userinfo_header_name)
-            end
-        end
-    end
-
-    if response == nil then
-        response = make_oidc(oidcConfig)
-        if response then
-            if response.user or response.id_token then
-                -- is there any scenario where lua-resty-openidc would not provide id_token?
-                utils.setCredentials(response.user or response.id_token)
-            end
-            if response.user and response.user[oidcConfig.groups_claim] ~= nil then
-                utils.injectGroups(response.user, oidcConfig.groups_claim)
-            elseif response.id_token then
-                utils.injectGroups(response.id_token, oidcConfig.groups_claim)
-            end
-            utils.injectHeaders(oidcConfig.header_names, oidcConfig.header_claims, { response.user, response.id_token })
-            if (not oidcConfig.disable_userinfo_header
-                    and response.user) then
-                utils.injectUser(response.user, oidcConfig.userinfo_header_name)
-            end
-            if (not oidcConfig.disable_access_token_header
-                    and response.access_token) then
-                utils.injectAccessToken(response.access_token, oidcConfig.access_token_header_name,
-                    oidcConfig.access_token_as_bearer)
-            end
-            if (not oidcConfig.disable_id_token_header
-                    and response.id_token) then
-                utils.injectIDToken(response.id_token, oidcConfig.id_token_header_name)
-            end
-        end
-    end
-end
-
-function make_oidc(oidcConfig)
+local function make_oidc(oidcConfig, session_opts)
     ngx.log(ngx.DEBUG, "OidcHandler calling authenticate, requested path: " .. ngx.var.request_uri)
+
     local unauth_action = oidcConfig.unauth_action
     if unauth_action ~= "auth" then
         -- constant for resty.oidc library
         unauth_action = "deny"
     end
-    local res, err = require("resty.openidc").authenticate(oidcConfig, ngx.var.request_uri, unauth_action)
+
+    local res, err = require("resty.openidc").authenticate(oidcConfig, ngx.var.request_uri, unauth_action, session_opts)
 
     if err then
         if err == 'unauthorized request' then
@@ -106,10 +29,19 @@ function make_oidc(oidcConfig)
             return kong.response.error(ngx.HTTP_INTERNAL_SERVER_ERROR)
         end
     end
+
+    if res and res.id_token then
+        -- Log safe token metadata (never log full token contents)
+        ngx.log(ngx.DEBUG, "OIDC authentication successful - " ..
+            "sub: " .. (res.id_token.sub or "unknown") ..
+            ", email: " .. (res.id_token.email or "unknown") ..
+            ", exp: " .. (res.id_token.exp or "unknown"))
+    end
+
     return res
 end
 
-function introspect(oidcConfig)
+local function introspect(oidcConfig)
     if utils.has_bearer_access_token() or oidcConfig.bearer_only == "yes" then
         local res, err
         if oidcConfig.use_jwks == "yes" then
@@ -119,7 +51,10 @@ function introspect(oidcConfig)
         end
         if err then
             if oidcConfig.bearer_only == "yes" then
-                ngx.header["WWW-Authenticate"] = 'Bearer realm="' .. oidcConfig.realm .. '",error="' .. err .. '"'
+                -- Sanitize header values to prevent HTTP response splitting attacks
+                local safe_realm = utils.sanitize_header_value(oidcConfig.realm)
+                local safe_err = utils.sanitize_header_value(err)
+                ngx.header["WWW-Authenticate"] = 'Bearer realm="' .. safe_realm .. '",error="' .. safe_err .. '"'
                 return kong.response.error(ngx.HTTP_UNAUTHORIZED)
             end
             return nil
@@ -168,7 +103,7 @@ local function validate_bearer_jwt_scope(oidcConfig, scope_claim)
     return false
 end
 
-function verify_bearer_jwt(oidcConfig)
+local function verify_bearer_jwt(oidcConfig)
     if not utils.has_bearer_access_token() then
         return nil
     end
@@ -191,7 +126,7 @@ function verify_bearer_jwt(oidcConfig)
     local allowed_auds = oidcConfig.bearer_jwt_auth_allowed_auds or oidcConfig.client_id
 
     local jwt_validators = require "resty.jwt-validators"
-    jwt_validators.set_system_leeway(120)
+    jwt_validators.set_system_leeway(30)
     local claim_spec = {
         -- mandatory for id token: iss, sub, aud, exp, iat
         iss = jwt_validators.equals(discovery_doc.issuer),
@@ -214,6 +149,94 @@ function verify_bearer_jwt(oidcConfig)
     end
 
     return json
+end
+
+function OidcHandler:access(config)
+    local oidcConfig = utils.get_options(config, ngx)
+
+    -- partial support for plugin chaining: allow skipping requests, where higher priority
+    -- plugin has already set the credentials. The 'config.anomyous' approach to define
+    -- "and/or" relationship between auth plugins is not utilized
+    if oidcConfig.skip_already_auth_requests and kong.client.get_credential() then
+        ngx.log(ngx.DEBUG, "OidcHandler ignoring already auth request: " .. ngx.var.request_uri)
+        return
+    end
+
+    -- SECURITY: Clear all sensitive headers at the start to prevent spoofing attacks
+    -- These headers should only be set by this plugin after successful authentication
+    utils.clear_sensitive_headers(oidcConfig)
+
+    if filter.shouldProcessRequest(oidcConfig) then
+        local session_opts, session_err = utils.get_session_opts(config)
+        if session_err then
+            kong.log.err("Session configuration error: ", session_err)
+            return kong.response.error(ngx.HTTP_INTERNAL_SERVER_ERROR)
+        end
+        session_opts = session.configure(session_opts)
+        Handle(oidcConfig, session_opts)
+    else
+        ngx.log(ngx.DEBUG, "OidcHandler ignoring request, path: " .. ngx.var.request_uri)
+    end
+
+    ngx.log(ngx.DEBUG, "OidcHandler done")
+end
+
+function Handle(oidcConfig, session_opts)
+    local response
+
+    if oidcConfig.bearer_jwt_auth_enable then
+        response = verify_bearer_jwt(oidcConfig)
+        if response then
+            utils.setCredentials(response)
+            utils.injectGroups(response, oidcConfig.groups_claim)
+            utils.injectHeaders(oidcConfig.header_names, oidcConfig.header_claims, { response })
+            if not oidcConfig.disable_userinfo_header then
+                utils.injectUser(response, oidcConfig.userinfo_header_name)
+            end
+            return
+        end
+    end
+
+    if oidcConfig.introspection_endpoint then
+        response = introspect(oidcConfig)
+        if response then
+            utils.setCredentials(response)
+            utils.injectGroups(response, oidcConfig.groups_claim)
+            utils.injectHeaders(oidcConfig.header_names, oidcConfig.header_claims, { response })
+            if not oidcConfig.disable_userinfo_header then
+                utils.injectUser(response, oidcConfig.userinfo_header_name)
+            end
+        end
+    end
+
+    if response == nil then
+        response = make_oidc(oidcConfig, session_opts)
+        if response then
+            if response.user or response.id_token then
+                -- is there any scenario where lua-resty-openidc would not provide id_token?
+                utils.setCredentials(response.user or response.id_token)
+            end
+            if response.user and response.user[oidcConfig.groups_claim] ~= nil then
+                utils.injectGroups(response.user, oidcConfig.groups_claim)
+            elseif response.id_token then
+                utils.injectGroups(response.id_token, oidcConfig.groups_claim)
+            end
+            utils.injectHeaders(oidcConfig.header_names, oidcConfig.header_claims, { response.user, response.id_token })
+            if (not oidcConfig.disable_userinfo_header
+                    and response.user) then
+                utils.injectUser(response.user, oidcConfig.userinfo_header_name)
+            end
+            if (not oidcConfig.disable_access_token_header
+                    and response.access_token) then
+                utils.injectAccessToken(response.access_token, oidcConfig.access_token_header_name,
+                    oidcConfig.access_token_as_bearer)
+            end
+            if (not oidcConfig.disable_id_token_header
+                    and response.id_token) then
+                utils.injectIDToken(response.id_token, oidcConfig.id_token_header_name)
+            end
+        end
+    end
 end
 
 return OidcHandler
