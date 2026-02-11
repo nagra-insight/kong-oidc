@@ -31,7 +31,11 @@ local function make_oidc(oidcConfig, session_opts)
     end
 
     if res and res.id_token then
-        ngx.log(ngx.DEBUG, "OIDC id_token: " .. cjson.encode(res.id_token))
+        -- Log safe token metadata (never log full token contents)
+        ngx.log(ngx.DEBUG, "OIDC authentication successful - " ..
+            "sub: " .. (res.id_token.sub or "unknown") ..
+            ", email: " .. (res.id_token.email or "unknown") ..
+            ", exp: " .. (res.id_token.exp or "unknown"))
     end
 
     return res
@@ -47,7 +51,10 @@ local function introspect(oidcConfig)
         end
         if err then
             if oidcConfig.bearer_only == "yes" then
-                ngx.header["WWW-Authenticate"] = 'Bearer realm="' .. oidcConfig.realm .. '",error="' .. err .. '"'
+                -- Sanitize header values to prevent HTTP response splitting attacks
+                local safe_realm = utils.sanitize_header_value(oidcConfig.realm)
+                local safe_err = utils.sanitize_header_value(err)
+                ngx.header["WWW-Authenticate"] = 'Bearer realm="' .. safe_realm .. '",error="' .. safe_err .. '"'
                 return kong.response.error(ngx.HTTP_UNAUTHORIZED)
             end
             return nil
@@ -119,7 +126,7 @@ local function verify_bearer_jwt(oidcConfig)
     local allowed_auds = oidcConfig.bearer_jwt_auth_allowed_auds or oidcConfig.client_id
 
     local jwt_validators = require "resty.jwt-validators"
-    jwt_validators.set_system_leeway(120)
+    jwt_validators.set_system_leeway(30)
     local claim_spec = {
         -- mandatory for id token: iss, sub, aud, exp, iat
         iss = jwt_validators.equals(discovery_doc.issuer),
@@ -155,8 +162,16 @@ function OidcHandler:access(config)
         return
     end
 
+    -- SECURITY: Clear all sensitive headers at the start to prevent spoofing attacks
+    -- These headers should only be set by this plugin after successful authentication
+    utils.clear_sensitive_headers(oidcConfig)
+
     if filter.shouldProcessRequest(oidcConfig) then
-        local session_opts = utils.get_session_opts(config)
+        local session_opts, session_err = utils.get_session_opts(config)
+        if session_err then
+            kong.log.err("Session configuration error: ", session_err)
+            return kong.response.error(ngx.HTTP_INTERNAL_SERVER_ERROR)
+        end
         session_opts = session.configure(session_opts)
         Handle(oidcConfig, session_opts)
     else
