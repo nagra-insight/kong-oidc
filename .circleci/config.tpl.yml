@@ -101,6 +101,10 @@ jobs:
       - {{ tmpl.Exec "step_aws_setup" | indent 8 | strings.TrimSpace }}
       - {{ tmpl.Exec "step_install_jq" (dict "yq" false) | indent 8 | strings.TrimSpace }}
       - {{ tmpl.Exec "step_install_github_cli" | indent 8 | strings.TrimSpace }}
+      - run:
+          name: Setup GitHub SSH known hosts
+          command: |
+            {{ tmpl.Exec "configure_github_keys" | indent 12 | strings.TrimSpace }}
       - run: make release
 
 workflows:
